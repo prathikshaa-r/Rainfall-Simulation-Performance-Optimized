@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <time.h>
 
+struct timespec start_time, end_time;
+
 double calc_time(struct timespec start, struct timespec end) {
    double start_sec = (double)start.tv_sec*1000000000.0 + (double)start.tv_nsec;
    double end_sec = (double)end.tv_sec*1000000000.0 + (double)end.tv_nsec;
@@ -14,16 +16,16 @@ double calc_time(struct timespec start, struct timespec end) {
    }
  }
 
+
 void print_data(int N, float **data_struct){
-	for (int i = 0; i < N; ++i)
-	{
-		for (int j = 0; j < N; ++j)
-		{
+	for (int i = 0; i < N; ++i){
+		for (int j = 0; j < N; ++j){
 			fprintf(stderr, "%0.2f ", data_struct[i][j]);
 		}
 		fprintf(stderr, "\n");
 	}
 }
+
 
 struct simulation_struct
 {
@@ -37,6 +39,7 @@ struct simulation_struct
 	float **trickle; // keep track of trickle in each time-step
 	float **rain_absorbed; // rain absorbed in each tile output
 	const char *elevation_file; // name of input file
+
 } typedef simulation;
 
 void usage(const char *prog_name){
@@ -133,38 +136,31 @@ void read_landscape(simulation *sim_data){
 int calculate_trickle(simulation *sim_data, int rain_drop){
 	int N = sim_data->N;
 
-	if (!(rain_drop))
-	{
+	if (!(rain_drop)){
 		// if cur_rain is all zeros, return 1
-		printf("rain_drop: %d\n", rain_drop);
+		//printf("rain_drop: %d\n", rain_drop);
 		int keep_going = 0;
-		for (int i = 0; i < N; ++i)
-		{
-			for (int j = 0; j < N; ++j)
-			{
-				if (sim_data->current_rain[i][j])
-				{
+		for (int i = 0; i < N; ++i){
+			for (int j = 0; j < N; ++j){
+				if (sim_data->current_rain[i][j]){
 					keep_going = 1;
 					break;
 				}
 			}
-			if (keep_going)
-			{
+			if (keep_going){
 				break;
 			}
 		}
 
-		printf("keep_going: %d\n", keep_going);
+		//printf("keep_going: %d\n", keep_going);
 		if (!(keep_going)){
-			printf("keep_going: %d\n", keep_going);
+			//printf("keep_going: %d\n", keep_going);
 			return 1;
 		}
 	}
 
-	for (int i = 0; i < N; i++)
-	{
-		for (int j = 0; j < N; j++)
-		{
+	for (int i = 0; i < N; i++){
+		for (int j = 0; j < N; j++){
 
 			// add rain_drop if raining
 			sim_data->current_rain[i][j] += rain_drop;
@@ -174,8 +170,6 @@ int calculate_trickle(simulation *sim_data, int rain_drop){
 			sim_data->rain_absorbed[i][j] += new_absorbed;
 			sim_data->current_rain[i][j] -= new_absorbed;
 
-			printf("current_rain after absorption\n");
-			print_data(sim_data->N, sim_data->current_rain);
 			
 			// TRICKLE ONLY IF ONE FULL DROP IS AVAILABLE
 			if(sim_data->current_rain[i][j] > 0){
@@ -240,14 +234,12 @@ int calculate_trickle(simulation *sim_data, int rain_drop){
 			
 
 				float div_count = 0; // count num of low lying points
-				for (int i = 0; i < 4; ++i)
-				{
+				for (int i = 0; i < 4; ++i){
 					if(track_arr[i]) div_count++;
 				}
 			
 				// divide and trickle
-				for (int i = 0; i < 4; ++i)
-				{
+				for (int i = 0; i < 4; ++i){
 					if(track_arr[i]){
 						switch(i){
 							case 0:
@@ -271,12 +263,9 @@ int calculate_trickle(simulation *sim_data, int rain_drop){
 								break;
 						}
 					}
-				} // end of divide and trickle
-				printf("Subtracted trickle amount\n");
+				} 
 				sim_data->current_rain[i][j] -= trickle_amt;
 
-				printf("current_rain after trickling\n");
-				print_data(sim_data->N, sim_data->current_rain);
 			} // END OF TRICKLE IF 1 DROP
 
 		}
@@ -285,10 +274,8 @@ int calculate_trickle(simulation *sim_data, int rain_drop){
 }
 
 void update_trickle(simulation *sim_data){
-	for (int i = 0; i < sim_data->N; ++i)
-	{
-		for (int j = 0; j < sim_data->N; ++j)
-		{
+	for (int i = 0; i < sim_data->N; ++i){
+		for (int j = 0; j < sim_data->N; ++j){
 			sim_data->current_rain[i][j] += sim_data->trickle[i][j];
 		}
 	}
@@ -300,47 +287,35 @@ void run_simulation(simulation *sim_data){
 	int N = sim_data->N;
 
 	// loop over num_steps
+	clock_gettime(CLOCK_MONOTONIC, &start_time);
 	for(sim_data->num_steps = 0; ;sim_data->num_steps++){ // break when cur_rain is all 0
 	    // absorb drops in current block
 	    // check neighbours to flow the rest
 	    // check i+1, j+1
-
-		printf("current_rain\n");
-		print_data(sim_data->N, sim_data->current_rain);
-		printf("rain_absorbed\n");
-		print_data(sim_data->N, sim_data->rain_absorbed);
 	    int stop_true = calculate_trickle(sim_data, ((sim_data->num_steps < num_rain_steps)?1:0));
 	    update_trickle(sim_data);
-	    for (int i = 0; i < sim_data->N; ++i)
-		{
+	    for (int i = 0; i < sim_data->N; ++i){
 			sim_data->trickle[i] = (float *)malloc(sizeof(int) * sim_data->N);
 			memset(sim_data->trickle[i], 0, (sizeof(int) * sim_data->N));
 		}
 
-	    fprintf(stderr, "-----------------------------------------------\n");
 	    if (stop_true) break;
 
-	    // if(sim_data->num_steps == 15){
-	    // 	printf("10 steps reached without breaking! :(");
-	    // 	break;
-	    // }
 	}
+	clock_gettime(CLOCK_MONOTONIC, &end_time);
 }
 
 // write the result of the simulation to output file
 void write_result(simulation *sim_data){
 	// write sim_data->rain_absorbed to elevation_file + ".out"
 	// space seperated
-	fprintf(stderr, "Num of steps: %d\n", sim_data->num_steps);
 
-	printf("rain_absorbed\n");
-	print_data(sim_data->N, sim_data->rain_absorbed);
+	double elapsed_s = calc_time(start_time, end_time) / 1000000000.0;
+	printf("Rainfall simulation took %d time steps to complete.\n", sim_data->num_steps);
+	printf("Runtime = %f seconds.\n", elapsed_s);
+	
 
-	printf("current_rain\n");
-	print_data(sim_data->N, sim_data->current_rain);
 
-	printf("trickle\n");
-	print_data(sim_data->N, sim_data->trickle);
 }
 
 int main(int argc, char const *argv[])
@@ -358,35 +333,30 @@ int main(int argc, char const *argv[])
 	sim_data->elevation_file = argv[5]; // elevation filename
 
 	sim_data->num_steps = 0;
-	
+
 	sim_data->landscape = (int**)malloc(sizeof(int*)*(sim_data->N));
-	for (int i = 0; i < sim_data->N; ++i)
-	{
+	for (int i = 0; i < sim_data->N; ++i){
 		sim_data->landscape[i] = (int *)malloc(sizeof(int) * sim_data->N);
 		memset(sim_data->landscape[i], 0, (sizeof(int) * sim_data->N));
 	}
 
 	sim_data->rain_absorbed = (float**)malloc(sizeof(int*)*(sim_data->N));
-	for (int i = 0; i < sim_data->N; ++i)
-	{
+	for (int i = 0; i < sim_data->N; ++i){
 		sim_data->rain_absorbed[i] = (float *)malloc(sizeof(int) * sim_data->N);
 		memset(sim_data->rain_absorbed[i], 0, (sizeof(int) * sim_data->N));
 	}
 
 	sim_data->current_rain = (float**)malloc(sizeof(int*)*(sim_data->N));
-	for (int i = 0; i < sim_data->N; ++i)
-	{
+	for (int i = 0; i < sim_data->N; ++i){
 		sim_data->current_rain[i] = (float *)malloc(sizeof(int) * sim_data->N);
 		memset(sim_data->current_rain[i], 0, (sizeof(int) * sim_data->N));
 	}
 
 	sim_data->trickle = (float**)malloc(sizeof(int*)*(sim_data->N));
-	for (int i = 0; i < sim_data->N; ++i)
-	{
+	for (int i = 0; i < sim_data->N; ++i){
 		sim_data->trickle[i] = (float *)malloc(sizeof(int) * sim_data->N);
 		memset(sim_data->trickle[i], 0, (sizeof(int) * sim_data->N));
 	}
-
 	
 	read_landscape(sim_data);
 	run_simulation(sim_data);
