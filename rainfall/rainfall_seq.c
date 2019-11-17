@@ -20,7 +20,7 @@ double calc_time(struct timespec start, struct timespec end) {
 void print_data(int N, float **data_struct){
 	for (int i = 0; i < N; ++i){
 		for (int j = 0; j < N; ++j){
-			fprintf(stderr, "%0.2f ", data_struct[i][j]);
+			fprintf(stderr, "%10.2f ", data_struct[i][j]);
 		}
 		fprintf(stderr, "\n");
 	}
@@ -313,8 +313,9 @@ void write_result(simulation *sim_data){
 	double elapsed_s = calc_time(start_time, end_time) / 1000000000.0;
 	printf("Rainfall simulation took %d time steps to complete.\n", sim_data->num_steps);
 	printf("Runtime = %f seconds.\n", elapsed_s);
-	
-
+	printf("\n");
+	printf("The following grid shows the number of raindrops absorbed at each point:\n");
+	print_data(sim_data->N,sim_data->rain_absorbed);
 
 }
 
