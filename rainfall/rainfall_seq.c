@@ -14,6 +14,16 @@ double calc_time(struct timespec start, struct timespec end) {
    }
  }
 
+void print_data(int N, float **data_struct){
+	for (int i = 0; i < N; ++i)
+	{
+		for (int j = 0; j < N; ++j)
+		{
+			fprintf(stderr, "%0.2f ", data_struct[i][j]);
+		}
+		fprintf(stderr, "\n");
+	}
+}
 
 struct simulation_struct
 {
@@ -126,12 +136,13 @@ int calculate_trickle(simulation *sim_data, int rain_drop){
 	if (!(rain_drop))
 	{
 		// if cur_rain is all zeros, return 1
+		printf("rain_drop: %d\n", rain_drop);
 		int keep_going = 0;
 		for (int i = 0; i < N; ++i)
 		{
 			for (int j = 0; j < N; ++j)
 			{
-				if (sim_data->current_rain)
+				if (sim_data->current_rain[i][j])
 				{
 					keep_going = 1;
 					break;
@@ -142,125 +153,130 @@ int calculate_trickle(simulation *sim_data, int rain_drop){
 				break;
 			}
 		}
-		return 1;
+
+		printf("keep_going: %d\n", keep_going);
+		if (!(keep_going)){
+			printf("keep_going: %d\n", keep_going);
+			return 1;
+		}
 	}
 
-	printf("N in calculate_trickle = %d\n", N);
 	for (int i = 0; i < N; i++)
 	{
 		for (int j = 0; j < N; j++)
 		{
 
-			printf("N in calculate_trickle = %d\n", N);
 			// add rain_drop if raining
-			printf("Start\n");
-			printf("Rain Drop: %d\n", rain_drop);
-			printf("sim_data->current_rain: %f\n", sim_data->current_rain[i][j]);
 			sim_data->current_rain[i][j] += rain_drop;
-			printf("i, j, landscape: %d, %d, %d\n", i, j, sim_data->landscape[i][j]);
-			printf("sim_data->current_rain after rain: %f\n", sim_data->current_rain[i][j]);
-
 			// absorb rain
-			sim_data->rain_absorbed[i][j] = (sim_data->A >= sim_data->current_rain[i][j]) ? sim_data->current_rain[i][j] : sim_data->A;
-			sim_data->current_rain[i][j] -= sim_data->rain_absorbed[i][j];
-			printf("Before trickle\n");
 
-			// calculate trickle
-			float *north_trickle, *south_trickle, *east_trickle, *west_trickle; // pointer to trickle arr
-			int north, south, east, west, cur; // landscape values
-			north = south = east = west = -1;
+			float new_absorbed = ((sim_data->A >= sim_data->current_rain[i][j]) ? sim_data->current_rain[i][j] : sim_data->A);
+			sim_data->rain_absorbed[i][j] += new_absorbed;
+			sim_data->current_rain[i][j] -= new_absorbed;
 
-			north_trickle = south_trickle = east_trickle = west_trickle = NULL;
-
-			cur = sim_data->landscape[i][j];
-
-			printf("Step-0.5\n");
-
-			if(i > 0){
-				south = sim_data->landscape[i-1][j];
-				south_trickle = &sim_data->trickle[i-1][j];
-			}
-			if(i < N-1){
-				north = sim_data->landscape[i+1][j];
-				north_trickle = &sim_data->trickle[i+1][j];
-			}
-			if(j > 0){
-				west = sim_data->landscape[i][j-1];
-				west_trickle = &sim_data->trickle[i][j-1];
-			}
-			if(j < N-1){
-				east = sim_data->landscape[i][j+1];
-				east_trickle = &sim_data->trickle[i][j+1];
-			}
-			printf("Step-1\n");
-			// now check where to trickle
-			// find min elevation
-			int track_arr[4] = {0, 0, 0, 0}; // N S E W
+			printf("current_rain after absorption\n");
+			print_data(sim_data->N, sim_data->current_rain);
 			
-			int smallest = cur;
-			if (north_trickle)
-			{
-			 	smallest = (north > smallest) ? smallest : north;
-			}
-			if (south_trickle)
-			{
-				smallest = (south > smallest) ? smallest : south;
-			}
-			if (east_trickle)
-			{
-				smallest = (east > smallest) ? smallest : east;
-			}
-			if (west_trickle)
-			{
-				smallest = (west > smallest) ? smallest : west;
-			}
+			// TRICKLE ONLY IF ONE FULL DROP IS AVAILABLE
+			if(sim_data->current_rain[i][j] >= 1){
 
-			printf("Step-2\n");
+				// calculate trickle
+				float *north_trickle, *south_trickle, *east_trickle, *west_trickle; // pointer to trickle arr
+				int north, south, east, west, cur; // landscape values
+				north = south = east = west = -1;
 
-			if(smallest == cur) continue;
-			
-			if (north == smallest) track_arr[0] = 1;
-			if (south == smallest) track_arr[1] = 1;
-			if (east == smallest) track_arr[2] = 1;
-			if (west == smallest) track_arr[3] = 1;
+				north_trickle = south_trickle = east_trickle = west_trickle = NULL;
+				cur = sim_data->landscape[i][j];
 
-			printf("Step-3\n");
 
-			float div_count = 0; // count num of low lying points
-			for (int i = 0; i < 4; ++i)
-			{
-				if(track_arr[i]) div_count++;
-			}
-			printf("Div Count: %f\n", div_count);
-			printf("Step-3.5\n");
-			// divide and trickle
-			for (int i = 0; i < 4; ++i)
-			{
-				if(track_arr[i]){
-					switch(i){
-						case 0:
-							printf("North\n");
-							*north_trickle += 1/div_count;
-							break;
-
-						case 1:
-							printf("South\n");
-							*south_trickle += 1/div_count;
-							break;
-
-						case 2:							
-							printf("East\n");
-							*east_trickle += 1/div_count;
-							break;
-
-						case 3:							
-							printf("West\n");
-							*west_trickle += 1/div_count;
-							break;
-					}
+				if(i > 0){
+					south = sim_data->landscape[i-1][j];
+					south_trickle = &sim_data->trickle[i-1][j];
 				}
-			} // end of divide and trickle
-			printf("Step-4\n");
+				if(i < N-1){
+					north = sim_data->landscape[i+1][j];
+					north_trickle = &sim_data->trickle[i+1][j];
+				}
+				if(j > 0){
+					west = sim_data->landscape[i][j-1];
+					west_trickle = &sim_data->trickle[i][j-1];
+				}
+				if(j < N-1){
+					east = sim_data->landscape[i][j+1];
+					east_trickle = &sim_data->trickle[i][j+1];
+				}
+				
+				// now check where to trickle
+				// find min elevation
+				int track_arr[4] = {0, 0, 0, 0}; // N S E W
+				int smallest = cur;
+				if (north_trickle)
+				{
+				 	smallest = (north > smallest) ? smallest : north;
+				}
+				if (south_trickle)
+				{
+					smallest = (south > smallest) ? smallest : south;
+				}
+				if (east_trickle)
+				{
+					smallest = (east > smallest) ? smallest : east;
+				}
+				if (west_trickle)
+				{
+					smallest = (west > smallest) ? smallest : west;
+				}
+
+			
+
+				if(smallest == cur) continue;
+				
+				if (north == smallest) track_arr[0] = 1;
+				if (south == smallest) track_arr[1] = 1;
+				if (east == smallest) track_arr[2] = 1;
+				if (west == smallest) track_arr[3] = 1;
+
+			
+
+				float div_count = 0; // count num of low lying points
+				for (int i = 0; i < 4; ++i)
+				{
+					if(track_arr[i]) div_count++;
+				}
+			
+				// divide and trickle
+				for (int i = 0; i < 4; ++i)
+				{
+					if(track_arr[i]){
+						switch(i){
+							case 0:
+								
+								*north_trickle += 1/div_count;
+								break;
+
+							case 1:
+								
+								*south_trickle += 1/div_count;
+								break;
+
+							case 2:							
+							
+								*east_trickle += 1/div_count;
+								break;
+
+							case 3:							
+								
+								*west_trickle += 1/div_count;
+								break;
+						}
+					}
+				} // end of divide and trickle
+				printf("Subtracted trickle amount\n");
+				sim_data->current_rain[i][j]--;
+
+				printf("current_rain after trickling\n");
+				print_data(sim_data->N, sim_data->current_rain);
+			} // END OF TRICKLE IF 1 DROP
 
 		}
 	}
@@ -268,23 +284,45 @@ int calculate_trickle(simulation *sim_data, int rain_drop){
 }
 
 void update_trickle(simulation *sim_data){
-
+	for (int i = 0; i < sim_data->N; ++i)
+	{
+		for (int j = 0; j < sim_data->N; ++j)
+		{
+			sim_data->current_rain[i][j] += sim_data->trickle[i][j];
+		}
+	}
 }
 
 // only function that is parallelized later
 void run_simulation(simulation *sim_data){
 	int num_rain_steps = sim_data->M;
 	int N = sim_data->N;
-	printf("N in run_sim = %d\n", N);
 
 	// loop over num_steps
 	for(sim_data->num_steps = 0; ;sim_data->num_steps++){ // break when cur_rain is all 0
 	    // absorb drops in current block
 	    // check neighbours to flow the rest
 	    // check i+1, j+1
+
+		printf("current_rain\n");
+		print_data(sim_data->N, sim_data->current_rain);
+		printf("rain_absorbed\n");
+		print_data(sim_data->N, sim_data->rain_absorbed);
 	    int stop_true = calculate_trickle(sim_data, ((sim_data->num_steps < num_rain_steps)?1:0));
 	    update_trickle(sim_data);
+	    for (int i = 0; i < sim_data->N; ++i)
+		{
+			sim_data->trickle[i] = (float *)malloc(sizeof(int) * sim_data->N);
+			memset(sim_data->trickle[i], 0, (sizeof(int) * sim_data->N));
+		}
+
+	    fprintf(stderr, "-----------------------------------------------\n");
 	    if (stop_true) break;
+
+	    // if(sim_data->num_steps == 10){
+	    // 	printf("10 steps reached without breaking! :(");
+	    // 	break;
+	    // }
 	}
 }
 
@@ -292,6 +330,16 @@ void run_simulation(simulation *sim_data){
 void write_result(simulation *sim_data){
 	// write sim_data->rain_absorbed to elevation_file + ".out"
 	// space seperated
+	fprintf(stderr, "Num of steps: %d\n", sim_data->num_steps);
+
+	printf("rain_absorbed\n");
+	print_data(sim_data->N, sim_data->rain_absorbed);
+
+	printf("current_rain\n");
+	print_data(sim_data->N, sim_data->current_rain);
+
+	printf("trickle\n");
+	print_data(sim_data->N, sim_data->trickle);
 }
 
 int main(int argc, char const *argv[])
@@ -307,8 +355,6 @@ int main(int argc, char const *argv[])
 	sim_data->A = str_to_float(argv[3]); // absorption = A
 	sim_data->N = str_to_num(argv[4]); // N dimensional landscape
 	sim_data->elevation_file = argv[5]; // elevation filename
-
-	printf("N=%d\n", sim_data->N);
 
 	sim_data->num_steps = 0;
 	
@@ -340,13 +386,10 @@ int main(int argc, char const *argv[])
 		memset(sim_data->trickle[i], 0, (sizeof(int) * sim_data->N));
 	}
 
-	printf("N before read: %d\n", sim_data->N);
+	
 	read_landscape(sim_data);
-	printf("N after read: %d\n", sim_data->N);
 	run_simulation(sim_data);
-	printf("N after sim: %d\n", sim_data->N);
 	write_result(sim_data);
-	printf("N after write: %d\n", sim_data->N);
 
 	free(sim_data->rain_absorbed);
 	free(sim_data->landscape);
