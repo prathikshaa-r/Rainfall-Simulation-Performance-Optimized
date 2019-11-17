@@ -178,7 +178,8 @@ int calculate_trickle(simulation *sim_data, int rain_drop){
 			print_data(sim_data->N, sim_data->current_rain);
 			
 			// TRICKLE ONLY IF ONE FULL DROP IS AVAILABLE
-			if(sim_data->current_rain[i][j] >= 1){
+			if(sim_data->current_rain[i][j] > 0){
+				float trickle_amt = ((1 >= sim_data->current_rain[i][j]) ? sim_data->current_rain[i][j] : 1);
 
 				// calculate trickle
 				float *north_trickle, *south_trickle, *east_trickle, *west_trickle; // pointer to trickle arr
@@ -251,28 +252,28 @@ int calculate_trickle(simulation *sim_data, int rain_drop){
 						switch(i){
 							case 0:
 								
-								*north_trickle += 1/div_count;
+								*north_trickle += trickle_amt/div_count;
 								break;
 
 							case 1:
 								
-								*south_trickle += 1/div_count;
+								*south_trickle += trickle_amt/div_count;
 								break;
 
 							case 2:							
 							
-								*east_trickle += 1/div_count;
+								*east_trickle += trickle_amt/div_count;
 								break;
 
 							case 3:							
 								
-								*west_trickle += 1/div_count;
+								*west_trickle += trickle_amt/div_count;
 								break;
 						}
 					}
 				} // end of divide and trickle
 				printf("Subtracted trickle amount\n");
-				sim_data->current_rain[i][j]--;
+				sim_data->current_rain[i][j] -= trickle_amt;
 
 				printf("current_rain after trickling\n");
 				print_data(sim_data->N, sim_data->current_rain);
@@ -319,7 +320,7 @@ void run_simulation(simulation *sim_data){
 	    fprintf(stderr, "-----------------------------------------------\n");
 	    if (stop_true) break;
 
-	    // if(sim_data->num_steps == 10){
+	    // if(sim_data->num_steps == 15){
 	    // 	printf("10 steps reached without breaking! :(");
 	    // 	break;
 	    // }
