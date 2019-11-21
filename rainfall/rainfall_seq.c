@@ -317,6 +317,8 @@ void write_result(simulation *sim_data){
 	printf("The following grid shows the number of raindrops absorbed at each point:\n");
 	print_data(sim_data->N,sim_data->rain_absorbed);
 
+
+
 }
 
 int main(int argc, char const *argv[])
