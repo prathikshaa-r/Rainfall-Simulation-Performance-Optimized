@@ -17,12 +17,12 @@ double calc_time(struct timespec start, struct timespec end) {
  }
 
 
-void print_data(int N, float **data_struct){
+void print_data(FILE* stream, int N, float **data_struct){
 	for (int i = 0; i < N; ++i){
 		for (int j = 0; j < N; ++j){
-		  fprintf (stderr, "%8.6f ", data_struct[i][j]);
+		  fprintf (stream, "%8.6g ", data_struct[i][j]);
 		}
-		fprintf(stderr, "\n");
+		fprintf(stream, "\n");
 	}
 }
 
@@ -316,7 +316,7 @@ void write_result(simulation *sim_data){
 	fprintf(stderr, "Runtime = %f seconds.\n", elapsed_s);
 	fprintf(stderr, "\n");
 	fprintf(stderr, "The following grid shows the number of raindrops absorbed at each point:\n");
-	print_data(sim_data->N, sim_data->rain_absorbed);
+	print_data(stderr, sim_data->N, sim_data->rain_absorbed);
 }
 
 int main(int argc, char const *argv[])
