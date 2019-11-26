@@ -4,7 +4,6 @@
 #include <errno.h>
 #include <time.h>
 
-
 struct timespec start_time, end_time;
 
 double calc_time(struct timespec start, struct timespec end) {
@@ -104,7 +103,6 @@ int get_nums(int size, const char *line, int *landscape_row){
 	}
 }
 
-
 // read landscape from elevation file
 void read_landscape(simulation *sim_data){
 	// open file sim_data->elevation_file
@@ -137,6 +135,29 @@ void read_landscape(simulation *sim_data){
 
 int calculate_trickle(simulation *sim_data, int rain_drop){
 	int N = sim_data->N;
+
+	if (!(rain_drop)){
+		// if cur_rain is all zeros, return 1
+		//printf("rain_drop: %d\n", rain_drop);
+		int keep_going = 0;
+		for (int i = 0; i < N; ++i){
+			for (int j = 0; j < N; ++j){
+				if (sim_data->current_rain[i][j]){
+					keep_going = 1;
+					break;
+				}
+			}
+			if (keep_going){
+				break;
+			}
+		}
+
+		//printf("keep_going: %d\n", keep_going);
+		if (!(keep_going)){
+			//printf("keep_going: %d\n", keep_going);
+			return 1;
+		}
+	}
 
 	for (int i = 0; i < N; i++){
 		for (int j = 0; j < N; j++){
@@ -260,50 +281,27 @@ void update_trickle(simulation *sim_data){
 	}
 }
 
-void get_bounds(simulation * sim_data, int thread_id, int *bounds){
-  int P = sim_data->P;
-  int N = sim_data->N;
-
-  bounds[0] = thread_id * (N/P); // min - inclusive
-  bounds[1] = (thread_id+1) * (N/P); // max - exclusive
-  if(thread_id == (P-1)) {bounds[1] += (N%P);}
-  printf("min:%d, max=%d\n", bounds[0], bounds[1]);
-}
-
-int all_absorbed(simulation *sim_data){
-  int N = sim_data->N;
-  if(sim_data->num_steps < sim_data->M){
-    return 0;
-  }
-  for (int i = 0; i < N; ++i){ // rows
-    for (int j = 0; j < N; ++j){ // columns
-      if (sim_data->current_rain[i][j]){ // if value non-zero
-	return 0; // return false
-      } // end if
-    } // end cols
-  } // end rows
-  return 1;
-}
-
 // only function that is parallelized later
-void run_simulation(simulation * sim_data){
+void run_simulation(simulation *sim_data){
 	int num_rain_steps = sim_data->M;
 	int N = sim_data->N;
+
 	// loop over num_steps
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
 	for(sim_data->num_steps = 0; ;sim_data->num_steps++){ // break when cur_rain is all 0
 	    // absorb drops in current block
 	    // check neighbours to flow the rest
 	    // check i+1, j+1
-	    calculate_trickle(sim_data, ((sim_data->num_steps < num_rain_steps)?1:0));
+	    int stop_true = calculate_trickle(sim_data, ((sim_data->num_steps < num_rain_steps)?1:0));
 	    update_trickle(sim_data);
 	    for (int i = 0; i < sim_data->N; ++i){
 	      if (!(sim_data->trickle[i])){
-		sim_data->trickle[i] = (float *)malloc(sizeof(float) * sim_data->N);
-	      }
-	      memset(sim_data->trickle[i], 0, (sizeof(float) * sim_data->N));
-	    }
-	    if(all_absorbed(sim_data)) break;
+		sim_data->trickle[i] = (float *)malloc(sizeof(float) * sim_data->N); }
+			memset(sim_data->trickle[i], 0, (sizeof(float) * sim_data->N));
+		}
+
+	    if (stop_true) break;
+
 	}
 	clock_gettime(CLOCK_MONOTONIC, &end_time);
 }
@@ -362,12 +360,6 @@ int main(int argc, char const *argv[])
 	}
 	
 	read_landscape(sim_data);
-
-	// Don't create more threads than rows in the matrix
-	if(sim_data->P > sim_data->N){
-	  sim_data->P = sim_data->N;
-	}
-
 	run_simulation(sim_data);
 	write_result(sim_data);
 
