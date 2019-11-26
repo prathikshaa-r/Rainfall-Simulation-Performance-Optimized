@@ -20,7 +20,7 @@ double calc_time(struct timespec start, struct timespec end) {
 void print_data(int N, float **data_struct){
 	for (int i = 0; i < N; ++i){
 		for (int j = 0; j < N; ++j){
-			fprintf(stderr, "%10f ", data_struct[i][j]);
+		  fprintf (stderr, "%8.6f ", data_struct[i][j]);
 		}
 		fprintf(stderr, "\n");
 	}
@@ -111,7 +111,7 @@ void read_landscape(simulation *sim_data){
 	// for each line, getc non-space character
 	// landscape[i][j] = str_to_num(char)
 	FILE * fp;
-	char * line;
+	char * line = 0;
 	size_t len = 0;
 	ssize_t read = 0;
 
@@ -295,7 +295,8 @@ void run_simulation(simulation *sim_data){
 	    int stop_true = calculate_trickle(sim_data, ((sim_data->num_steps < num_rain_steps)?1:0));
 	    update_trickle(sim_data);
 	    for (int i = 0; i < sim_data->N; ++i){
-			sim_data->trickle[i] = (float *)malloc(sizeof(float) * sim_data->N);
+	      if (!(sim_data->trickle[i])){
+		sim_data->trickle[i] = (float *)malloc(sizeof(float) * sim_data->N); }
 			memset(sim_data->trickle[i], 0, (sizeof(float) * sim_data->N));
 		}
 
@@ -362,6 +363,13 @@ int main(int argc, char const *argv[])
 	run_simulation(sim_data);
 	write_result(sim_data);
 
+	for(int i = 0; i < sim_data->N; i++){
+	  if(sim_data->landscape[i]) free(sim_data->landscape[i]);
+	  if(sim_data->rain_absorbed[i]) free(sim_data->rain_absorbed[i]);
+	  if(sim_data->current_rain[i]) free(sim_data->current_rain[i]);
+	  if(sim_data->trickle[i]) free(sim_data->trickle[i]);
+	}
+	
 	free(sim_data->rain_absorbed);
 	free(sim_data->landscape);
 	free(sim_data->current_rain);
