@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O3 -fPIC
+CFLAGS= -O3 -ggdb3
 DEPS=
 
 all: rainfall_seq rainfall_pt

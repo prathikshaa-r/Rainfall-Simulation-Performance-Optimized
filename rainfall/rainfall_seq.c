@@ -20,7 +20,7 @@ double calc_time(struct timespec start, struct timespec end) {
 void print_data(int N, float **data_struct){
 	for (int i = 0; i < N; ++i){
 		for (int j = 0; j < N; ++j){
-			fprintf(stderr, "%10.2f ", data_struct[i][j]);
+			fprintf(stderr, "%10f ", data_struct[i][j]);
 		}
 		fprintf(stderr, "\n");
 	}
@@ -295,8 +295,8 @@ void run_simulation(simulation *sim_data){
 	    int stop_true = calculate_trickle(sim_data, ((sim_data->num_steps < num_rain_steps)?1:0));
 	    update_trickle(sim_data);
 	    for (int i = 0; i < sim_data->N; ++i){
-			sim_data->trickle[i] = (float *)malloc(sizeof(int) * sim_data->N);
-			memset(sim_data->trickle[i], 0, (sizeof(int) * sim_data->N));
+			sim_data->trickle[i] = (float *)malloc(sizeof(float) * sim_data->N);
+			memset(sim_data->trickle[i], 0, (sizeof(float) * sim_data->N));
 		}
 
 	    if (stop_true) break;
@@ -311,14 +311,11 @@ void write_result(simulation *sim_data){
 	// space seperated
 
 	double elapsed_s = calc_time(start_time, end_time) / 1000000000.0;
-	printf("Rainfall simulation took %d time steps to complete.\n", sim_data->num_steps);
-	printf("Runtime = %f seconds.\n", elapsed_s);
-	printf("\n");
-	printf("The following grid shows the number of raindrops absorbed at each point:\n");
-	print_data(sim_data->N,sim_data->rain_absorbed);
-
-
-
+	fprintf(stderr, "Rainfall simulation took %d time steps to complete.\n", sim_data->num_steps);
+	fprintf(stderr, "Runtime = %f seconds.\n", elapsed_s);
+	fprintf(stderr, "\n");
+	fprintf(stderr, "The following grid shows the number of raindrops absorbed at each point:\n");
+	print_data(sim_data->N, sim_data->rain_absorbed);
 }
 
 int main(int argc, char const *argv[])
