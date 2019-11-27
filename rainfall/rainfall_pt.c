@@ -8,6 +8,26 @@
 
 #include "rainfall_pt.h"
 
+// Locks for calc trickle
+// separate rows
+// when i is at bounds
+//
+pthread_mutex_t *row_locks;
+
+void init_row_locks(simulation *sim_data) {
+  row_locks = (pthread_mutex_t *) malloc(sizeof(*row_locks)*sim_data->N);
+  for (int i = 0; i < sim_data->N; i++) {
+    pthread_mutex_init(&row_locks[i], NULL);
+  }
+}
+
+void free_row_locks(simulation *sim_data){
+  for (int i = 0; i < sim_data->N; i++) {
+    pthread_mutex_destroy(&row_locks[i]);
+  }
+  free(row_locks);
+}
+
 struct timespec start_time, end_time;
 double calc_time(struct timespec start, struct timespec end) {
    double start_sec = (double)start.tv_sec*1000000000.0 + (double)start.tv_nsec;
@@ -251,32 +271,54 @@ int calculate_trickle(int * bounds, simulation *sim_data, int rain_drop){
 			
 
 				float div_count = 0; // count num of low lying points
-				for (int i = 0; i < 4; ++i){
-					if(track_arr[i]) div_count++;
+				for (int k = 0; k < 4; ++k){
+					if(track_arr[k]) div_count++;
 				}
 			
 				// divide and trickle
-				for (int i = 0; i < 4; ++i){
-					if(track_arr[i]){
-						switch(i){
+				for (int k = 0; k < 4; ++k){
+					if(track_arr[k]){
+						switch(k){
 							case 0:
-								
+							        /* if(bounds[1]!= (sim_data->P-1)){ */
+								/*   pthread_mutex_lock(&row_locks[bounds[1]+1]); */
+								/* } */
+							        pthread_mutex_lock(&row_locks[i+1]);
 								*north_trickle += trickle_amt/div_count;
+								pthread_mutex_unlock(&row_locks[i+1]);
+								/* if(bounds[1]!= (sim_data->P-1)){ */
+								/*   pthread_mutex_unlock(&row_locks[bounds[1]+1]); */
+								/* } */
 								break;
 
 							case 1:
-								
+								pthread_mutex_lock(&row_locks[i-1]);
 								*south_trickle += trickle_amt/div_count;
+								pthread_mutex_unlock(&row_locks[i-1]);
 								break;
 
 							case 2:							
-							
+								/* if((i == bounds[0])||(i == bounds[1]-1)){ */
+								/*   pthread_mutex_lock(&row_locks[i]); */
+								/* } */
+							        pthread_mutex_lock(&row_locks[i]);
 								*east_trickle += trickle_amt/div_count;
+								pthread_mutex_unlock(&row_locks[i]);
+								/* if((i == bounds[0])||(i == bounds[1]-1)){ */
+								/*   pthread_mutex_unlock(&row_locks[i]); */
+								/* } */
 								break;
 
 							case 3:							
-								
+								/* if((i == bounds[0])||(i == bounds[1]-1)){ */
+								/*   pthread_mutex_lock(&row_locks[i]); */
+								/* } */
+							        pthread_mutex_lock(&row_locks[i]);
 								*west_trickle += trickle_amt/div_count;
+								pthread_mutex_unlock(&row_locks[i]);
+								/* if((i == bounds[0])||(i == bounds[1]-1)){ */
+								/*   pthread_mutex_unlock(&row_locks[i]); */
+								/* } */
 								break;
 						}
 					}
@@ -431,7 +473,8 @@ int main(int argc, char const *argv[])
 		sim_data->trickle[i] = (float *)malloc(sizeof(int) * sim_data->N);
 		memset(sim_data->trickle[i], 0, (sizeof(int) * sim_data->N));
 	}
-	
+
+	init_row_locks(sim_data);
 	read_landscape(sim_data);
 
 	// Don't create more threads than rows in the matrix
@@ -457,6 +500,8 @@ int main(int argc, char const *argv[])
 
 	run_simulation(sim_data);
 	write_result(sim_data);
+
+	free_row_locks(sim_data);
 
 	for(int i = 0; i < sim_data->N; i++){
 	  if(sim_data->landscape[i]) free(sim_data->landscape[i]);
