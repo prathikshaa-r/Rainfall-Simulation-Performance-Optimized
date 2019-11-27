@@ -292,6 +292,8 @@ void run_simulation(simulation * sim_data){
 	// loop over num_steps
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
 	for(sim_data->num_steps = 0; ;sim_data->num_steps++){ // break when cur_rain is all 0
+
+	  if(all_absorbed(sim_data)) break;
 	    // absorb drops in current block
 	    // check neighbours to flow the rest
 	    // check i+1, j+1
@@ -303,7 +305,6 @@ void run_simulation(simulation * sim_data){
 	      }
 	      memset(sim_data->trickle[i], 0, (sizeof(float) * sim_data->N));
 	    }
-	    if(all_absorbed(sim_data)) break;
 	}
 	clock_gettime(CLOCK_MONOTONIC, &end_time);
 }

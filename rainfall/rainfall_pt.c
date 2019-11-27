@@ -6,8 +6,9 @@
 
 #include <pthread.h>
 
-struct timespec start_time, end_time;
+#include "rainfall_pt.h"
 
+struct timespec start_time, end_time;
 double calc_time(struct timespec start, struct timespec end) {
    double start_sec = (double)start.tv_sec*1000000000.0 + (double)start.tv_nsec;
    double end_sec = (double)end.tv_sec*1000000000.0 + (double)end.tv_nsec;
@@ -27,22 +28,6 @@ void print_data(FILE* stream, int N, float **data_struct){
 		fprintf(stream, "\n");
 	}
 }
-
-
-struct simulation_struct
-{
-	int P; // num_threads
-	int M; // rain steps
-	int num_steps; // total simulation steps
-	float A; // absorption
-	int N; // landscape size
-	int **landscape; // landscape array - input
-	float **current_rain; // keep track of rain through simulation
-	float **trickle; // keep track of trickle in each time-step
-	float **rain_absorbed; // rain absorbed in each tile output
-	const char *elevation_file; // name of input file
-
-} typedef simulation;
 
 void usage(const char *prog_name){
 	printf("Usage: %s <P> <M> <A> <N> <elevation_file> \n", prog_name);
@@ -97,22 +82,18 @@ float str_to_float(const char *str){
 	return val;
 }
 
-struct arg_struct {
-    	simulation *sim_data;
-        int thread_id;
-};
 
-void *print_the_arguments(void *arguments)
-{
-    printf("In print args...\n");
-    struct arg_struct *args = arguments; // line
-    printf("In print args...\n");
-    // print_data(stdout, args->sim_data->N, args->sim_data->current_rain);
-    printf("N: %d\n", args->sim_data->N);
-    printf("Thread ID:%d\n", args->thread_id);
-    pthread_exit(NULL);
-    return NULL;
-}
+/* void *print_the_arguments(void *arguments) */
+/* { */
+/*     printf("In print args...\n"); */
+/*     struct arg_struct *args = arguments; // line */
+/*     printf("In print args...\n"); */
+/*     // print_data(stdout, args->sim_data->N, args->sim_data->current_rain); */
+/*     printf("N: %d\n", args->sim_data->N); */
+/*     printf("Thread ID:%d\n", args->thread_id); */
+/*     pthread_exit(NULL); */
+/*     return NULL; */
+/* } */
 
 
 int get_nums(int size, const char *line, int *landscape_row){
@@ -153,11 +134,49 @@ void read_landscape(simulation *sim_data){
 	free(line);
 }
 
+int parallel_calculate_trickle(simulation *sim_data, int rain_drop){
+  pthread_t threads[sim_data->P];
+  for (int i = 0; i < sim_data->P; ++i)
+    {
+      // printf("Creating thread %d...\n", i);
+      calc_trickle_args *thread_args = (calc_trickle_args *)malloc(sizeof(*thread_args));
+      thread_args->sim_data = sim_data;
+      thread_args->thread_id = (int *)malloc(sizeof(int));
+      *(thread_args->thread_id) = i;
+      thread_args->rain_drop = rain_drop;
 
-int calculate_trickle(simulation *sim_data, int rain_drop){
+      if (pthread_create(&threads[i], NULL, &thread_calc_trickle, (void *)thread_args) != 0){
+	printf("Uh-oh!\n");
+	return -1;
+      }
+    }
+
+  for(int i = 0; i < sim_data->P; i++){
+    pthread_join(threads[i], NULL); /* Wait until thread is finished */
+  }
+}
+
+void *thread_calc_trickle(void *arguments){
+  calc_trickle_args *args = arguments;
+  simulation *sim_data = args->sim_data;
+  int thread_id = *(args->thread_id);
+
+  // printf("In threadid: %d| Before entering get_bounds()\n", thread_id);
+  int *bounds = malloc(sizeof(int) * 2);
+  get_bounds(sim_data, thread_id, bounds);
+  // printf("Bounds before calc trickle...:%d, %d\n", bounds[0], bounds[1]);
+  calculate_trickle(bounds, sim_data, args->rain_drop);
+
+  free(args->thread_id);
+  free(args);
+  free(bounds);
+}
+
+int calculate_trickle(int * bounds, simulation *sim_data, int rain_drop){
+  
 	int N = sim_data->N;
 
-	for (int i = 0; i < N; i++){
+	for (int i = bounds[0]; i < bounds[1]; i++){
 		for (int j = 0; j < N; j++){
 
 			// add rain_drop if raining
@@ -286,7 +305,7 @@ void get_bounds(simulation * sim_data, int thread_id, int *bounds){
   bounds[0] = thread_id * (N/P); // min - inclusive
   bounds[1] = (thread_id+1) * (N/P); // max - exclusive
   if(thread_id == (P-1)) {bounds[1] += (N%P);}
-  printf("min:%d, max=%d\n", bounds[0], bounds[1]);
+  // printf("Thread id: %d, P=%d, N=%d, min:%d, max=%d\n", thread_id, P, N, bounds[0], bounds[1]);
 }
 
 int all_absorbed(simulation *sim_data){
@@ -305,26 +324,17 @@ int all_absorbed(simulation *sim_data){
 }
 
 // only function that is parallelized later
-void *run_simulation(void *arguments){
-        struct arg_struct *args = arguments; // line
-        simulation * sim_data = args->sim_data;
-	int thread_id = args->thread_id;
-	printf("Sim Data:N: %d\n", sim_data->N);
-	printf("Thread ID %d\n", thread_id);
-	
+void run_simulation(simulation * sim_data){
 	int num_rain_steps = sim_data->M;
 	int N = sim_data->N;
-
-	int * bounds = malloc(sizeof(int) * 2);
-	get_bounds(sim_data, thread_id, bounds);
-
 	// loop over num_steps
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
 	for(sim_data->num_steps = 0; ;sim_data->num_steps++){ // break when cur_rain is all 0
 	    // absorb drops in current block
 	    // check neighbours to flow the rest
 	    // check i+1, j+1
-	    calculate_trickle(sim_data, ((sim_data->num_steps < num_rain_steps)?1:0));
+	    if(all_absorbed(sim_data)) break;
+	    parallel_calculate_trickle(sim_data, ((sim_data->num_steps < num_rain_steps)?1:0));
 	    update_trickle(sim_data);
 	    for (int i = 0; i < sim_data->N; ++i){
 	      if (!(sim_data->trickle[i])){
@@ -332,11 +342,42 @@ void *run_simulation(void *arguments){
 	      }
 	      memset(sim_data->trickle[i], 0, (sizeof(float) * sim_data->N));
 	    }
-	    if(all_absorbed(sim_data)) break;
 	}
 	clock_gettime(CLOCK_MONOTONIC, &end_time);
-	free(bounds);
 }
+
+/* void *run_simulation(void *arguments){ */
+/*         struct arg_struct *args = arguments; // line */
+/*         simulation * sim_data = args->sim_data; */
+/* 	int thread_id = args->thread_id; */
+/* 	printf("Sim Data:N: %d\n", sim_data->N); */
+/* 	printf("Thread ID %d\n", thread_id); */
+	
+/* 	int num_rain_steps = sim_data->M; */
+/* 	int N = sim_data->N; */
+
+/* 	int * bounds = malloc(sizeof(int) * 2); */
+/* 	get_bounds(sim_data, thread_id, bounds); */
+
+/* 	// loop over num_steps */
+/* 	clock_gettime(CLOCK_MONOTONIC, &start_time); */
+/* 	for(sim_data->num_steps = 0; ;sim_data->num_steps++){ // break when cur_rain is all 0 */
+/* 	    // absorb drops in current block */
+/* 	    // check neighbours to flow the rest */
+/* 	    // check i+1, j+1 */
+/* 	    calculate_trickle(sim_data, ((sim_data->num_steps < num_rain_steps)?1:0)); */
+/* 	    update_trickle(sim_data); */
+/* 	    for (int i = 0; i < sim_data->N; ++i){ */
+/* 	      if (!(sim_data->trickle[i])){ */
+/* 		sim_data->trickle[i] = (float *)malloc(sizeof(float) * sim_data->N); */
+/* 	      } */
+/* 	      memset(sim_data->trickle[i], 0, (sizeof(float) * sim_data->N)); */
+/* 	    } */
+/* 	    if(all_absorbed(sim_data)) break; */
+/* 	} */
+/* 	clock_gettime(CLOCK_MONOTONIC, &end_time); */
+/* 	free(bounds); */
+/* } */
 
 // write the result of the simulation to output file
 void write_result(simulation *sim_data){
