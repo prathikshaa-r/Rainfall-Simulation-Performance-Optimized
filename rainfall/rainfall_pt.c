@@ -3,9 +3,7 @@
 #include <string.h>
 #include <errno.h>
 #include <time.h>
-
 #include <pthread.h>
-
 #include "rainfall_pt.h"
 
 // Locks for calc trickle
@@ -280,21 +278,27 @@ int calculate_trickle(int * bounds, simulation *sim_data, int rain_drop){
 					if(track_arr[k]){
 						switch(k){
 							case 0:
-							        /* if(bounds[1]!= (sim_data->P-1)){ */
-								/*   pthread_mutex_lock(&row_locks[bounds[1]+1]); */
+							        /* if(i == (bounds[1] - 1)){ */
+								/*   pthread_mutex_lock(&row_locks[bounds[1]]); */
 								/* } */
 							        pthread_mutex_lock(&row_locks[i+1]);
 								*north_trickle += trickle_amt/div_count;
 								pthread_mutex_unlock(&row_locks[i+1]);
-								/* if(bounds[1]!= (sim_data->P-1)){ */
-								/*   pthread_mutex_unlock(&row_locks[bounds[1]+1]); */
+								/* if(i == (bounds[1]-1)){ */
+								/*   pthread_mutex_unlock(&row_locks[bounds[1]]); */
 								/* } */
 								break;
 
 							case 1:
-								pthread_mutex_lock(&row_locks[i-1]);
+							        /* if(i == bounds[0]){ */
+								/*   pthread_mutex_lock(&row_locks[bounds[0]-1]); */
+								/* } */
+							        pthread_mutex_lock(&row_locks[i-1]);
 								*south_trickle += trickle_amt/div_count;
 								pthread_mutex_unlock(&row_locks[i-1]);
+								/* if(i == bounds[0]){ */
+								/*   pthread_mutex_lock(&row_locks[bounds[0]-1]); */
+								/* } */
 								break;
 
 							case 2:							

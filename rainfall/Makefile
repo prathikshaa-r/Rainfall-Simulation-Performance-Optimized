@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -ggdb3
+CFLAGS = -O3 -fPIC
 LIB = -lpthread
 
 all: rainfall_seq rainfall_pt
